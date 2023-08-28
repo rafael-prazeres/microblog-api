@@ -160,3 +160,6 @@ class PasswordResetSchema(ma.Schema):
 class OAuth2Schema(ma.Schema):
     code = ma.String(required=True)
     state = ma.String(required=True)
+
+class OAuth2UrlSchema(ma.Schema):
+    url = ma.String(required=True)

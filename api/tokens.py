@@ -1,3 +1,5 @@
+import os
+import sys
 import secrets
 from urllib.parse import urlencode
 
@@ -11,7 +13,7 @@ from api.auth import basic_auth, token_auth
 from api.email import send_email
 from api.models import User, Token
 from api.schemas import TokenSchema, PasswordResetRequestSchema, \
-    PasswordResetSchema, OAuth2Schema, EmptySchema
+    PasswordResetSchema, OAuth2Schema, EmptySchema, OAuth2UrlSchema
 
 tokens = Blueprint('tokens', __name__)
 token_schema = TokenSchema()
@@ -128,7 +130,7 @@ def password_reset(args):
 
 
 @tokens.route('/tokens/oauth2/<provider>', methods=['GET'])
-@response(EmptySchema, status_code=302,
+@response(OAuth2UrlSchema, status_code=200,
           description="Redirect to OAuth2 provider's authentication page")
 @other_responses({404: 'Unknown OAuth2 provider'})
 def oauth2_authorize(provider):
@@ -137,6 +139,10 @@ def oauth2_authorize(provider):
     if provider_data is None:
         abort(404)
     session['oauth2_state'] = secrets.token_urlsafe(16)
+    session.modified = True
+    session.permanent = True
+    print("oauth2_autorize > session[oauth2_state] = " + session.get('oauth2_state'))
+    print("oauth2_authorize > session = " + str(session))
     qs = urlencode({
         'client_id': provider_data['client_id'],
         'redirect_uri': current_app.config['OAUTH2_REDIRECT_URI'].format(
@@ -145,7 +151,13 @@ def oauth2_authorize(provider):
         'scope': ' '.join(provider_data['scopes']),
         'state': session['oauth2_state'],
     })
-    return {}, 302, {'Location': provider_data['authorize_url'] + '?' + qs}
+    # print('qs = ' + str(qs), file=sys.stdout)
+    # return {}, 302, {'Location': provider_data['authorize_url'] + '?' + qs}
+    headers = {}
+    return {
+        'url': provider_data['authorize_url'] + '?' + str(qs),
+        }, 200, headers
+
 
 
 @tokens.route('/tokens/oauth2/<provider>', methods=['POST'])
@@ -164,8 +176,14 @@ def oauth2_new(args, provider):
     provider_data = current_app.config['OAUTH2_PROVIDERS'].get(provider)
     if provider_data is None:
         abort(404)
-    if args['state'] != session.get('oauth2_state'):
-        abort(401)
+    # if args['state'] != session.get('oauth2_state'):
+    #     abort(401)
+    print("args > code = " + args['code'])
+    print("args > state = " + args['state'])
+    print("secret key = " + current_app.config['SECRET_KEY'])
+    print("oauth2_new > session = " + str(session))
+    # print("oauth2_new > session[oauth2_state] = " + session.get('oauth2_state'))
+
     response = requests.post(provider_data['access_token_url'], data={
         'client_id': provider_data['client_id'],
         'client_secret': provider_data['client_secret'],
@@ -174,15 +192,24 @@ def oauth2_new(args, provider):
         'redirect_uri': current_app.config['OAUTH2_REDIRECT_URI'].format(
             provider=provider),
     }, headers={'Accept': 'application/json'})
+    print("oauth2_new > response = " + str(response))
     if response.status_code != 200:
         abort(401)
     oauth2_token = response.json().get('access_token')
     if not oauth2_token:
         abort(401)
-    response = requests.get(provider_data['get_user']['url'], headers={
-        'Authorization': 'Bearer ' + oauth2_token,
-        'Accept': 'application/json',
-    })
+    print('provider = ' + str(provider), file=sys.stdout)
+    if provider == 'api-sistemas':
+        response = requests.get(provider_data['get_user']['url'], headers={
+            'Authorization': 'Bearer ' + oauth2_token,
+            'Accept': 'application/json',
+            'x-api-key': os.environ.get('API_SISTEMAS_X_API_KEY'),
+        })
+    else:
+        response = requests.get(provider_data['get_user']['url'], headers={
+            'Authorization': 'Bearer ' + oauth2_token,
+            'Accept': 'application/json',
+        })
     if response.status_code != 200:
         abort(401)
     email = provider_data['get_user']['email'](response.json())

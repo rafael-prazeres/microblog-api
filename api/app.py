@@ -6,6 +6,8 @@ from flask_cors import CORS
 from flask_mail import Mail
 from apifairy import APIFairy
 from config import Config
+# from flask_session import Session
+from datetime import timedelta
 
 db = Alchemical()
 migrate = Migrate()
@@ -18,6 +20,11 @@ apifairy = APIFairy()
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    # app.permanent_session_lifetime = timedelta(minutes=5)
+    # app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=5)
+    # app.config["SESSION_PERMANENT"] = False
+    # app.config["SESSION_TYPE"] = "filesystem"
+    # Session(app)
 
     # extensions
     from api import models

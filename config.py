@@ -57,6 +57,19 @@ class Config:
             },
             'scopes': ['user:email'],
         },
+        # https://api.ufrn.br/documentacao.html
+        # #authorization-section
+        'api-sistemas': {
+            'client_id': os.environ.get('API_SISTEMAS_CLIENT_ID'),
+            'client_secret': os.environ.get('API_SISTEMAS_CLIENT_SECRET'),
+            'authorize_url': os.environ.get('API_SISTEMAS_URL_AUTH')+'/authz-server/oauth/authorize',
+            'access_token_url': os.environ.get('API_SISTEMAS_URL_AUTH')+'/authz-server/oauth/token',
+            'get_user': {
+                'url': os.environ.get('API_SISTEMAS_URL_BASE')+'/usuario/v1/usuarios/info',
+                'email': lambda json: json['email'],
+            },
+            'scopes': [],
+        },
     }
     OAUTH2_REDIRECT_URI = os.environ.get('OAUTH2_REDIRECT_URI') or \
         'http://localhost:3000/oauth2/{provider}/callback'
